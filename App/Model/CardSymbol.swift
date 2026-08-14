@@ -184,6 +184,30 @@ enum Metrics {
     static let minimumCardSide: CGFloat = 64
     /// Glyph occupies 52% of the card's shorter side.
     static let symbolScale: CGFloat = 0.52
+
+    /// Every rounded corner in the game is continuous, never circular.
+    static let cornerStyle: RoundedCornerStyle = .continuous
+
+    /// The top bar: 44 pt tall, with a 44 x 44 pt target on the restart
+    /// control so it is comfortable to hit.
+    static let topBarHeight: CGFloat = 44
+    static let restartHitTarget = CGSize(width: 44, height: 44)
+
+    /// Every gap and inset the game screen lays out with. All of them sit on
+    /// `Spacing.scale`.
+    ///
+    /// `cardGap` is not here: it is the gap inside the board grid, which
+    /// `ART.md` pins at 10 pt in the same breath as the scale it breaks.
+    static let gameScreenSpacings: [CGFloat] = [
+        boardInset,
+        topBarStackSpacing,
+        topBarSideInset,
+    ]
+
+    /// Space between the top bar and the board.
+    static let topBarStackSpacing: CGFloat = 16
+    /// Side inset on the top bar's contents.
+    static let topBarSideInset: CGFloat = 16
 }
 
 extension Color {
