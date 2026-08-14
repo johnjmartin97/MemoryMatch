@@ -9,10 +9,16 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    DEVELOPMENT_TEAM: ""
+    # Signing is per-SDK: simulators (the factory and CI) never sign, so no
+    # agent or runner ever needs an Apple identity — while a developer's own
+    # machine can produce device-installable builds from this same spec by
+    # exporting DEVELOPMENT_TEAM before generating (see Scripts/generate.sh;
+    # the credential lives in ~/.powerplant/env, never in this repository).
+    DEVELOPMENT_TEAM: ${DEVELOPMENT_TEAM}
+    CODE_SIGN_STYLE: Automatic
     CODE_SIGNING_REQUIRED: "NO"
-    CODE_SIGNING_ALLOWED: "NO"
-    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]: "NO"
+    CODE_SIGNING_ALLOWED[sdk=iphoneos*]: "YES"
 
 targets:
   MemoryMatch:

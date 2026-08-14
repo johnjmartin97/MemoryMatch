@@ -53,6 +53,8 @@ jobs:
       - name: Generate the Xcode project
         # Derived from project.yml, never hand-edited — and regenerated here so
         # a committed .xcodeproj could not change what actually gets built.
+        env:
+          DEVELOPMENT_TEAM: ""
         run: xcodegen generate
 
       - name: Run the deterministic gate suite
