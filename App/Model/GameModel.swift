@@ -28,10 +28,15 @@ final class GameModel {
 
     /// True while two cards are face up and waiting to be judged. Taps do
     /// nothing while the board is locked.
-    private(set) var isLocked: Bool = false
+    var isLocked: Bool { faceUpIndices.count >= 2 }
 
     /// True only when all 16 cards are matched.
-    var isWon: Bool { false }
+    var isWon: Bool { cards.allSatisfy { $0.state == .matched } }
+
+    /// The positions of the cards currently face up.
+    private var faceUpIndices: [Int] {
+        cards.indices.filter { cards[$0].state == .faceUp }
+    }
 
     init(seed: UInt64 = .random(in: 0...UInt64.max)) {
         var generator = SeededGenerator(seed: seed)
@@ -49,8 +54,21 @@ final class GameModel {
     }
 
     /// Turns a face-down card face up, when the board allows it.
-    func tap(_ index: Int) {}
+    func tap(_ index: Int) {
+        guard !isLocked, cards[index].state == .faceDown else { return }
+        cards[index].state = .faceUp
+    }
 
     /// Judges the two face-up cards and ends the turn.
-    func resolveTurn() {}
+    func resolveTurn() {
+        let open = faceUpIndices
+        guard open.count == 2 else { return }
+
+        let (first, second) = (open[0], open[1])
+        let matched = cards[first].symbol == cards[second].symbol
+        let resolved: CardState = matched ? .matched : .faceDown
+        cards[first].state = resolved
+        cards[second].state = resolved
+        moveCount += 1
+    }
 }
