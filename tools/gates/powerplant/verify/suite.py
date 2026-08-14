@@ -319,6 +319,11 @@ def check_frozen_files_clean(
         path = line[3:].strip()
         if not path:
             continue
+        # Bytecode caches are the judge's own exhaust, not an edit to it: CI
+        # runs the vendored suite via PYTHONPATH=tools/gates, and importing it
+        # writes __pycache__ inside the frozen tree on every single run.
+        if "__pycache__" in path or path.endswith(".pyc"):
+            continue
         if path.endswith(DEFAULT_TEST_SUFFIXES) or any(_matches(path, p) for p in patterns):
             dirty.append(path)
 
