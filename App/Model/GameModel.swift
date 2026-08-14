@@ -47,14 +47,48 @@ final class GameModel {
         self.isLocked = isLocked
     }
 
-    // MARK: - Red-gate stubs (behaviour not implemented yet)
+    // MARK: - Play
 
     /// True when every card is matched.
-    var isWon: Bool { false }
+    var isWon: Bool { cards.allSatisfy { $0.state == .matched } }
 
-    /// Turns a face-down card face up, if the board allows it.
-    func tap(_ index: Int) {}
+    /// The positions of the cards currently face up.
+    private var faceUpPositions: [Int] {
+        cards.indices.filter { cards[$0].state == .faceUp }
+    }
 
-    /// Judges the two face-up cards and ends the turn.
-    func resolveTurn() {}
+    /// Turns a face-down card face up, if the board allows it. A tap is refused
+    /// while the board is locked, on a card that is not face down, and once two
+    /// cards are already face up.
+    func tap(_ index: Int) {
+        guard !isLocked, cards.indices.contains(index) else { return }
+        guard cards[index].state == .faceDown else { return }
+
+        var faceUp = faceUpPositions
+        guard faceUp.count < 2 else { return }
+
+        cards[index].state = .faceUp
+        faceUp.append(index)
+        if faceUp.count == 2 {
+            isLocked = true
+        }
+    }
+
+    /// Judges the two face-up cards and ends the turn: same symbol and they
+    /// stay up as matched, different and they go back down. Either way the
+    /// board unlocks and the turn counts as one move.
+    func resolveTurn() {
+        let faceUp = faceUpPositions
+        guard faceUp.count == 2 else { return }
+
+        let first = faceUp[0]
+        let second = faceUp[1]
+        let matched = cards[first].symbol == cards[second].symbol
+        let resolvedState: CardState = matched ? .matched : .faceDown
+        cards[first].state = resolvedState
+        cards[second].state = resolvedState
+
+        moveCount += 1
+        isLocked = false
+    }
 }
