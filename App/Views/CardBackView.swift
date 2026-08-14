@@ -11,7 +11,7 @@ struct CardBackView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     /// Inset from the card edge, and the opacity of that ring.
-    private static let rings: [(inset: CGFloat, opacity: Double)] = [
+    static let rings: [(inset: CGFloat, opacity: Double)] = [
         (8, 0.22),
         (15, 0.16),
         (22, 0.10),

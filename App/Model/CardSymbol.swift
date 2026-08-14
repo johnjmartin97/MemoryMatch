@@ -110,6 +110,14 @@ enum Palette {
     static let cardStrokeDark = Color.white.opacity(0x1A / 255.0)
     static let matchedVeilDark = Color(hex: 0x0F1318).opacity(0x99 / 255.0)
 
+    static func backgroundTop(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? backgroundTopDark : backgroundTopLight
+    }
+
+    static func backgroundBottom(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? backgroundBottomDark : backgroundBottomLight
+    }
+
     static func surface(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? surfaceDark : surfaceLight
     }
@@ -155,16 +163,49 @@ enum Palette {
     }
 }
 
+/// The type scale from `ART.md`: SF Rounded throughout, monospaced digits
+/// wherever a number changes so the layout never jitters.
+enum Typography {
+    static let display = Font.system(size: 40, weight: .bold, design: .rounded)
+    static let title = Font.system(size: 26, weight: .semibold, design: .rounded)
+    static let body = Font.system(size: 17, weight: .medium, design: .rounded)
+    static let caption = Font.system(size: 13, weight: .semibold, design: .rounded)
+
+    static let moveCount = body.monospacedDigit()
+    static let timer = body.monospacedDigit()
+}
+
+/// The spacing scale from `ART.md`. Nothing off-scale.
+enum Spacing: CaseIterable {
+    case xs, s, m, l, xl, xxl
+
+    var points: CGFloat {
+        switch self {
+        case .xs: return 4
+        case .s: return 8
+        case .m: return 12
+        case .l: return 16
+        case .xl: return 24
+        case .xxl: return 32
+        }
+    }
+}
+
 /// Layout constants from `ART.md`. Spacing stays on the 4/8/12/16/24/32 scale.
 enum Metrics {
     static let cardCornerRadius: CGFloat = 14
     static let panelCornerRadius: CGFloat = 24
     static let buttonCornerRadius: CGFloat = 12
+    static let cornerStyle = RoundedCornerStyle.continuous
     static let cardHairline: CGFloat = 1.5
     static let cardBackPatternStroke: CGFloat = 2
     static let cardGap: CGFloat = 10
     static let boardInset: CGFloat = 16
     static let minimumCardSide: CGFloat = 64
+    static let topBarHeight: CGFloat = 44
+    static let topBarSideInset: CGFloat = 16
+    /// Thumb-safe target for the restart control.
+    static let restartHitTarget = CGSize(width: 44, height: 44)
     /// Glyph occupies 52% of the card's shorter side.
     static let symbolScale: CGFloat = 0.52
 }
