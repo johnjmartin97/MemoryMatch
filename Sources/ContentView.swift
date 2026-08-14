@@ -14,6 +14,10 @@ enum BoardOverlay: Equatable {
 struct ContentView: View {
     @State private var model = GameModel()
 
+    /// Light or dark. The cards already follow it; the screen must too, or
+    /// the two halves of the palette end up on screen at the same time.
+    @Environment(\.colorScheme) private var colorScheme
+
     let screen: RootScreen = .board
     let overlay: BoardOverlay? = nil
 
@@ -27,22 +31,15 @@ struct ContentView: View {
             )
 
             ZStack {
-                LinearGradient(
-                    colors: [
-                        Palette.backgroundTopLight,
-                        Palette.backgroundBottomLight,
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                Palette.backgroundGradient(colorScheme)
+                    .ignoresSafeArea()
 
                 VStack(spacing: 16) {
                     // Placeholder for the top bar PP-4 brings in; the launch
                     // UI test looks for this title.
                     Text("MemoryMatch")
                         .font(.system(size: 17, weight: .medium, design: .rounded))
-                        .foregroundStyle(Palette.textMutedLight)
+                        .foregroundStyle(Palette.textMuted(colorScheme))
                         .accessibilityIdentifier("app.title")
 
                     BoardView(cards: cards)
