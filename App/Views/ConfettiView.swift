@@ -1,5 +1,36 @@
 import SwiftUI
 
+/// The Reduce Motion fade in, held apart from the view so the ribbons cannot
+/// go back to hanging off `isActive`.
+///
+/// The confetti is put on screen with `isActive` already `true`, and it stays
+/// `true` for the whole life of the view. A fade keyed to it therefore never
+/// runs. The opacity lives here instead: it starts at 0, and moves to 1 one
+/// pass later, which is the change the 400 ms easeOut runs on.
+struct ConfettiFadeState: Equatable {
+    /// How strongly the ribbons are showing, 0 to 1.
+    private(set) var opacity: Double = 0
+
+    private var hasBegun = false
+
+    /// The curve the ribbons fade in on.
+    static var animation: Animation { Motion.confetti(reduceMotion: true).animation }
+
+    /// Starts the fade. Returns how many seconds it takes, or `nil` if the
+    /// board is not won yet or the ribbons have already faded in.
+    mutating func begin(isActive: Bool) -> Double? {
+        guard isActive, !hasBegun else { return nil }
+        hasBegun = true
+        opacity = 0
+        return Double(Motion.confetti(reduceMotion: true).durationMilliseconds) / 1000
+    }
+
+    /// The ribbons are all the way in.
+    mutating func complete() {
+        opacity = 1
+    }
+}
+
 /// The win celebration: sixty small ribbons that burst upward, spin, and settle
 /// under gravity over two seconds behind the win panel.
 ///
@@ -19,6 +50,8 @@ struct ConfettiView: View {
     @State private var hasSettled = false
     /// The wait for the end of the burst, held so a second win can replace it.
     @State private var settle: Task<Void, Never>?
+    /// The Reduce Motion fade in.
+    @State private var fade = ConfettiFadeState()
 
     static let ribbonCount = Motion.confetti(reduceMotion: false).ribbonCount
 
@@ -40,8 +73,7 @@ struct ConfettiView: View {
                             .position(restingPoint(for: ribbon, in: geometry.size))
                     }
                 }
-                .opacity(isActive ? 1 : 0)
-                .animation(Motion.confetti(reduceMotion: true).animation, value: isActive)
+                .opacity(fade.opacity)
             } else if isActive, let burstStartedAt, !hasSettled {
                 TimelineView(.animation) { timeline in
                     Canvas { context, size in
@@ -59,9 +91,28 @@ struct ConfettiView: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .onAppear { startBurst() }
+        .onAppear { start() }
         .onChange(of: isActive) { _, active in
-            if active { startBurst() }
+            if active { start() }
+        }
+    }
+
+    /// The win: either the burst, or the Reduce Motion fade.
+    private func start() {
+        if reduceMotion {
+            startFade()
+        } else {
+            startBurst()
+        }
+    }
+
+    /// Fades the ribbons in over 400 ms. The hidden first frame has to reach
+    /// the screen before the fade is animated, or both changes land in one
+    /// pass and the ribbons simply appear.
+    private func startFade() {
+        guard fade.begin(isActive: isActive) != nil else { return }
+        DispatchQueue.main.async {
+            withAnimation(ConfettiFadeState.animation) { fade.complete() }
         }
     }
 
