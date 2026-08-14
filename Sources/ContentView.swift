@@ -12,7 +12,7 @@ enum BoardOverlay: Equatable {
 }
 
 struct ContentView: View {
-    @State private var model = GameModel()
+    @State private var session: GameSession
 
     /// Light or dark. The cards already follow it; the screen must too, or
     /// the two halves of the palette end up on screen at the same time.
@@ -21,7 +21,11 @@ struct ContentView: View {
     let screen: RootScreen = .board
     let overlay: BoardOverlay? = nil
 
-    var cards: [Card] { model.cards }
+    var cards: [Card] { session.cards }
+
+    init(session: GameSession = GameSession()) {
+        _session = State(initialValue: session)
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -35,20 +39,34 @@ struct ContentView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: Metrics.topBarStackSpacing) {
-                    // Placeholder for the top bar PP-4 brings in; the launch
-                    // UI test looks for this title.
-                    Text("MemoryMatch")
-                        .font(Typography.body.font)
-                        .foregroundStyle(Palette.textMuted(colorScheme))
-                        .frame(height: Metrics.topBarHeight)
-                        .padding(.horizontal, Metrics.topBarSideInset)
-                        .accessibilityIdentifier("app.title")
+                    // The timer ticks once a second; nothing else on the bar
+                    // needs a schedule.
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        TopBarView(
+                            moveCount: session.moveCount,
+                            elapsed: session.elapsed,
+                            restart: { session.restart() }
+                        )
+                    }
 
                     BoardView(cards: cards)
                         .frame(width: size.width, height: size.height)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .confirmationDialog(
+            "Start a new game?",
+            isPresented: Binding(
+                get: { session.isRestartConfirmationRequested },
+                set: { if !$0 { session.cancelRestart() } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Restart", role: .destructive) { session.confirmRestart() }
+            Button("Keep playing", role: .cancel) { session.cancelRestart() }
+        } message: {
+            Text("This clears the pairs you have already matched.")
         }
     }
 }
