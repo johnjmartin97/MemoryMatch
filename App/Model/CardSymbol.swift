@@ -110,6 +110,23 @@ enum Palette {
     static let cardStrokeDark = Color.white.opacity(0x1A / 255.0)
     static let matchedVeilDark = Color(hex: 0x0F1318).opacity(0x99 / 255.0)
 
+    static func backgroundTop(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? backgroundTopDark : backgroundTopLight
+    }
+
+    static func backgroundBottom(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? backgroundBottomDark : backgroundBottomLight
+    }
+
+    /// The screen's background wash, top to bottom, for one appearance.
+    static func backgroundGradient(_ scheme: ColorScheme) -> LinearGradient {
+        LinearGradient(
+            colors: [backgroundTop(scheme), backgroundBottom(scheme)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
     static func surface(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? surfaceDark : surfaceLight
     }
