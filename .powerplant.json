@@ -1,0 +1,8 @@
+{
+  "bundle_id": "com.powerplant.memorymatch",
+  "project_name": "MemoryMatch",
+  "scheme": "MemoryMatch",
+  "test_target": "MemoryMatchTests",
+  "uitest_target": "MemoryMatchUITests",
+  "work_type": "ios"
+}

@@ -1,0 +1,89 @@
+[
+  {
+    "id": "appicon",
+    "path": "App/Assets.xcassets/AppIcon.appiconset",
+    "generator": "appicon",
+    "source": "art/icon.svg",
+    "sizes": [1024, 180, 167, 152, 120, 87, 80, 76, 60, 58, 40, 29, 20],
+    "no_alpha": true,
+    "purpose": "App icon: two overlapping rounded cards on a warm dawn gradient, one face down showing the concentric card-back pattern in #2E6F7E, one face up showing a #E0A32E star. Home Screen and App Store listing."
+  },
+  {
+    "id": "background-light",
+    "path": "App/Assets.xcassets/Background.imageset/background-light.png",
+    "generator": "pil",
+    "source": "art/background_light.py",
+    "width": 1179,
+    "height": 2556,
+    "no_alpha": true,
+    "non_blank": true,
+    "purpose": "Light-mode game screen backdrop: vertical gradient #FDF6EC to #F0E2D2 with fine dithering so it never bands."
+  },
+  {
+    "id": "background-dark",
+    "path": "App/Assets.xcassets/Background.imageset/background-dark.png",
+    "generator": "pil",
+    "source": "art/background_dark.py",
+    "width": 1179,
+    "height": 2556,
+    "no_alpha": true,
+    "non_blank": true,
+    "purpose": "Dark-mode game screen backdrop: vertical gradient #1A1F26 to #0F1318 with fine dithering. Paired with background-light in one imageset via appearance variants."
+  },
+  {
+    "id": "cardback",
+    "path": "App/Views/CardBackView.swift",
+    "generator": "swift",
+    "source": "App/Views/CardBackView.swift",
+    "purpose": "Card-back pattern drawn in SwiftUI: flat #2E6F7E field (#3E8C9E dark) under three concentric continuous-rounded-rectangle strokes inset 8/15/22 pt at 22%/16%/10% opacity in #22545F. 14 pt continuous corner radius, 1.5 pt hairline. Scales to any card size."
+  },
+  {
+    "id": "cardface",
+    "path": "App/Views/CardFaceView.swift",
+    "generator": "swift",
+    "source": "App/Views/CardFaceView.swift",
+    "purpose": "Card face drawn in SwiftUI: #FFFFFF surface (#242B33 dark), one SF Symbol from the eight-symbol set at 52% of the card's shorter side, hierarchical rendering in its declared tint. Symbols and tints per ART.md."
+  },
+  {
+    "id": "symbolset",
+    "path": "App/Model/CardSymbol.swift",
+    "generator": "swift",
+    "source": "App/Model/CardSymbol.swift",
+    "purpose": "The eight card symbols as an enum with SF Symbol name, light tint, dark tint, and VoiceOver label: star.fill #E0A32E, heart.fill #D2566B, bolt.fill #7B5EA7, leaf.fill #4C9A6A, moon.fill #5B7FB9, umbrella.fill #E0714F, anchor #2E6F7E, bell.fill #8C7A6B. Silhouettes chosen to stay distinct in greyscale."
+  },
+  {
+    "id": "match-celebration",
+    "path": "App/Views/MatchSparkleView.swift",
+    "generator": "swift",
+    "source": "App/Views/MatchSparkleView.swift",
+    "purpose": "Match celebration drawn in SwiftUI: spring scale 1.0 to 1.12 to 1.0 over 380 ms on both matched cards, plus 8 sparkle dots of 3 pt in #4C9A6A travelling 0 to 46 pt over 520 ms. Reduce Motion drops the scale and keeps a 240 ms fade."
+  },
+  {
+    "id": "win-confetti",
+    "path": "App/Views/ConfettiView.swift",
+    "generator": "swift",
+    "source": "App/Views/ConfettiView.swift",
+    "purpose": "Win confetti drawn in SwiftUI with TimelineView: 60 ribbons of 6x12 pt in #E0A32E, #E0714F and #2E6F7E, bursting and settling over 2000 ms behind the win overlay. Reduce Motion shows a static 400 ms fade-in instead."
+  },
+  {
+    "id": "sfx-flip",
+    "path": "App/Resources/flip.wav",
+    "generator": "audio",
+    "source": "art/sfx_flip.py",
+    "purpose": "Card flip: soft paper snap, ~120 ms, 44.1 kHz mono 16-bit. Filtered noise burst with a fast decay, no tonal pitch. Played on every flip via AVAudioPlayer on an ambient session."
+  },
+  {
+    "id": "sfx-match",
+    "path": "App/Resources/match.wav",
+    "generator": "audio",
+    "source": "art/sfx_match.py",
+    "purpose": "Match: rising two-note chime, ~400 ms, 44.1 kHz mono 16-bit. Sine bells at E5 (659.3 Hz) then B5 (987.8 Hz), 60 ms apart, exponential decay."
+  },
+  {
+    "id": "sfx-win",
+    "path": "App/Resources/win.wav",
+    "generator": "audio",
+    "source": "art/sfx_win.py",
+    "purpose": "Win: short major arpeggio, ~1.2 s, 44.1 kHz mono 16-bit. C5-E5-G5-C6 at 140 ms spacing, soft bell tone, tail ringing out to silence."
+  }
+]
