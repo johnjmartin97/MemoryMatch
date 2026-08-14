@@ -122,7 +122,9 @@ final class GameModel {
     /// pick up. A game that was already won is not resumed.
     init(restoring saved: SavedGame?, seed: UInt64, clock: GameClock) {
         self.clock = clock
-        guard let saved, saved.states.contains(where: { $0 != .matched }) else {
+        guard let saved,
+              GameModel.isWellFormed(saved),
+              saved.states.contains(where: { $0 != .matched }) else {
             newGame(seed: seed)
             return
         }
@@ -133,6 +135,18 @@ final class GameModel {
         }
         moveCount = saved.moveCount
         accumulated = saved.elapsed
+    }
+
+    /// A save is only usable if it describes a whole board: 16 symbols, 16
+    /// matching states, and eight symbols each appearing exactly twice. A save
+    /// truncated by a crash, or written by an older build, would otherwise
+    /// build a short board that the 16-cell grid reads off the end of — and it
+    /// would do that on every launch, with no way out.
+    private static func isWellFormed(_ saved: SavedGame) -> Bool {
+        guard saved.symbols.count == 16, saved.states.count == 16 else { return false }
+        var counts: [CardSymbol: Int] = [:]
+        for symbol in saved.symbols { counts[symbol, default: 0] += 1 }
+        return counts.count == 8 && counts.values.allSatisfy { $0 == 2 }
     }
 
     func newGame(seed: UInt64) {
@@ -155,17 +169,18 @@ final class GameModel {
     func tap(_ index: Int) {
         guard cards.indices.contains(index) else { return }
 
+        // Rejected taps come first: a tap on a matched or face-up card must not
+        // cut short the look the player was given at a missed pair.
+        guard cards[index].state == .faceDown else { return }
+
         switch phase {
         case .revealing: return
         case .mismatchHold: turnFaceUpCardsDown()
         case .idle: break
         }
 
-        guard cards[index].state == .faceDown else { return }
-
         cards[index].state = .faceUp
         faceUpIndices.append(index)
-        moveCount += 1
         startTimingIfNeeded()
 
         guard faceUpIndices.count == 2 else { return }
@@ -184,6 +199,10 @@ final class GameModel {
     private func judgePair() {
         let first = faceUpIndices[0]
         let second = faceUpIndices[1]
+
+        // A move is a turn — two cards resolved — not a single card tap. Eight
+        // pairs found without a mistake is eight moves.
+        moveCount += 1
 
         if cards[first].symbol == cards[second].symbol {
             cards[first].state = .matched
