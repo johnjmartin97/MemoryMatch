@@ -50,8 +50,12 @@ struct ContentView: View {
                         )
                     }
 
-                    BoardView(cards: cards, dealID: session.dealID)
-                        .frame(width: size.width, height: size.height)
+                    BoardView(
+                        cards: cards,
+                        dealID: session.dealID,
+                        tap: { session.tap($0) }
+                    )
+                    .frame(width: size.width, height: size.height)
                 }
 
                 if session.isWon {
