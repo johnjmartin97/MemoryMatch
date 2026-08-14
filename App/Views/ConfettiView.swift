@@ -13,13 +13,16 @@ struct ConfettiView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let ribbonCount = 60
+    static let ribbonCount = Motion.confetti(reduceMotion: false).ribbonCount
+
     private let ribbonSize = CGSize(width: 6, height: 12)
-    private let duration: Double = 2.0
+    private var duration: Double {
+        Double(Motion.confetti(reduceMotion: false).durationMilliseconds) / 1000
+    }
 
     var body: some View {
         GeometryReader { geometry in
-            let ribbons = Self.ribbons(count: ribbonCount, in: geometry.size)
+            let ribbons = Self.ribbons(count: Self.ribbonCount, in: geometry.size)
 
             if reduceMotion {
                 // Static scatter that fades in over 400 ms: no fall, no spin.
@@ -31,7 +34,7 @@ struct ConfettiView: View {
                     }
                 }
                 .opacity(isActive ? 1 : 0)
-                .animation(.easeOut(duration: 0.4), value: isActive)
+                .animation(Motion.confetti(reduceMotion: true).animation, value: isActive)
             } else if isActive {
                 TimelineView(.animation) { timeline in
                     Canvas { context, size in

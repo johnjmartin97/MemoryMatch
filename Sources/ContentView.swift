@@ -19,7 +19,8 @@ struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     let screen: RootScreen = .board
-    let overlay: BoardOverlay? = nil
+
+    var overlay: BoardOverlay? { session.isWinOverlayPresented ? .win : nil }
 
     var cards: [Card] { session.cards }
 
@@ -52,6 +53,28 @@ struct ContentView: View {
                     BoardView(cards: cards)
                         .frame(width: size.width, height: size.height)
                 }
+
+                if session.isWon {
+                    ConfettiView(isActive: true)
+                }
+
+                if overlay == .win {
+                    WinOverlayView(
+                        moveCount: session.moveCount,
+                        elapsed: session.elapsed,
+                        playAgain: { session.playAgain() }
+                    )
+                    .transition(.opacity)
+                }
+            }
+            .animation(
+                Motion.flip(reduceMotion: false).animation,
+                value: session.isWinOverlayPresented
+            )
+            .onChange(of: session.isWinOverlayPresented) { _, presented in
+                guard presented else { return }
+                SoundPlayer.shared.play(.win)
+                Haptics.win()
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }

@@ -27,6 +27,14 @@ final class GameSession {
     /// True while the restart control is waiting for a yes or no.
     private(set) var isRestartConfirmationRequested = false
 
+    /// True once the win overlay is up. It waits 600 ms after the last pair
+    /// matches, so the pop and the sparkle are seen before the panel covers
+    /// the board.
+    private(set) var isWinOverlayPresented = false
+
+    /// Where the win pause goes. Held so a test can drive time by hand.
+    private let clock: TurnClock
+
     var cards: [Card] { model.cards }
     var moveCount: Int { model.moveCount }
     var isWon: Bool { model.isWon }
@@ -39,11 +47,14 @@ final class GameSession {
 
     init(
         seed: UInt64 = .random(in: 0...UInt64.max),
-        now: @escaping () -> TimeInterval = { Date().timeIntervalSinceReferenceDate }
+        now: @escaping () -> TimeInterval = { Date().timeIntervalSinceReferenceDate },
+        clock: TurnClock = SystemTurnClock()
     ) {
         self.now = now
+        self.clock = clock
         dealGenerator = SeededGenerator(seed: seed)
-        model = GameModel(seed: seed)
+        model = GameModel(seed: seed, clock: clock)
+        watchForWin()
     }
 
     /// Picks up a saved game. Anything missing, unreadable or already
@@ -51,16 +62,18 @@ final class GameSession {
     convenience init(
         restoring data: Data?,
         seed: UInt64 = .random(in: 0...UInt64.max),
-        now: @escaping () -> TimeInterval = { Date().timeIntervalSinceReferenceDate }
+        now: @escaping () -> TimeInterval = { Date().timeIntervalSinceReferenceDate },
+        clock: TurnClock = SystemTurnClock()
     ) {
-        self.init(seed: seed, now: now)
+        self.init(seed: seed, now: now, clock: clock)
         guard let data, let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data),
               let cards = snapshot.restoredCards(),
               !cards.allSatisfy({ $0.state == .matched })
         else { return }
 
-        model = GameModel(cards: cards, moveCount: snapshot.moveCount)
+        model = GameModel(cards: cards, moveCount: snapshot.moveCount, clock: clock)
         bankedElapsed = snapshot.elapsed
+        watchForWin()
     }
 
     // MARK: - Playing
@@ -116,6 +129,13 @@ final class GameSession {
         isRestartConfirmationRequested = false
     }
 
+    /// Takes the win overlay away and deals again. Nothing is left to lose at
+    /// this point, so it does not ask first.
+    func playAgain() {
+        isWinOverlayPresented = false
+        deal()
+    }
+
     // MARK: - Saving
 
     func encoded() throws -> Data {
@@ -131,10 +151,24 @@ final class GameSession {
     // MARK: - Internals
 
     private func deal() {
-        model = GameModel(seed: dealGenerator.next())
+        model = GameModel(seed: dealGenerator.next(), clock: clock)
+        watchForWin()
         bankedElapsed = 0
         runningSince = nil
         hasStarted = false
+        isWinOverlayPresented = false
+    }
+
+    /// Winning stops the clock at once, and brings the overlay up after the
+    /// celebration has had its moment.
+    private func watchForWin() {
+        model.onWin = { [weak self] in
+            guard let self else { return }
+            bankRunningTime()
+            clock.schedule(after: Motion.winOverlayDelayMilliseconds) { [weak self] in
+                self?.isWinOverlayPresented = true
+            }
+        }
     }
 
     /// Starts, or resumes, the running stretch — never before the first
