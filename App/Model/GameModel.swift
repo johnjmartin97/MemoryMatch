@@ -38,25 +38,76 @@ final class GameModel {
         cards.indices.filter { cards[$0].state == .faceUp }
     }
 
-    init(seed: UInt64 = .random(in: 0...UInt64.max)) {
+    /// Where delayed work goes. Held so a test can drive time by hand.
+    @ObservationIgnored private let clock: TurnClock
+
+    /// How long a finished pair stays face up before it is judged.
+    static let matchPauseMilliseconds = 300
+
+    /// How long a mismatched pair stays on show before it turns back down.
+    static let mismatchWindowMilliseconds = 900
+
+    /// Where the current turn has got to.
+    private enum Phase {
+        /// Nothing is waiting: fewer than two cards are face up.
+        case idle
+        /// Two cards are face up and the 300 ms pause is running.
+        case judging
+        /// The pair did not match and is on show for 900 ms.
+        case showingMismatch(first: Int, second: Int)
+    }
+
+    @ObservationIgnored private var phase: Phase = .idle
+
+    init(
+        seed: UInt64 = .random(in: 0...UInt64.max),
+        clock: TurnClock = SystemTurnClock()
+    ) {
+        self.clock = clock
+        cards = []
+        newGame(seed: seed)
+    }
+
+    /// Builds a board in a given state. The board is locked exactly when two
+    /// cards are face up.
+    init(cards: [Card], moveCount: Int = 0, clock: TurnClock = SystemTurnClock()) {
+        self.clock = clock
+        self.cards = cards
+        self.moveCount = moveCount
+    }
+
+    /// Deals a fresh board and clears the move count.
+    func newGame(seed: UInt64 = .random(in: 0...UInt64.max)) {
         var generator = SeededGenerator(seed: seed)
         let pairs = CardSymbol.allCases.flatMap { [$0, $0] }
         cards = pairs.shuffled(using: &generator).map {
             Card(symbol: $0, state: .faceDown)
         }
-    }
-
-    /// Builds a board in a given state. The board is locked exactly when two
-    /// cards are face up.
-    init(cards: [Card], moveCount: Int = 0) {
-        self.cards = cards
-        self.moveCount = moveCount
+        moveCount = 0
+        clock.cancelPending()
+        phase = .idle
     }
 
     /// Turns a face-down card face up, when the board allows it.
+    ///
+    /// A tap on a face-down card while a mismatch is on show cuts that window
+    /// short: the pair turns down at once and the tap lands on the fresh board.
     func tap(_ index: Int) {
+        if case .showingMismatch(let first, let second) = phase {
+            guard cards[index].state == .faceDown else { return }
+            clock.cancelPending()
+            endMismatch(first, second)
+        }
+
         guard !isLocked, cards[index].state == .faceDown else { return }
         cards[index].state = .faceUp
+
+        if faceUpIndices.count == 2 {
+            phase = .judging
+            clock.schedule(after: Self.matchPauseMilliseconds) { [weak self] in
+                self?.judgePair()
+            }
+        }
     }
 
     /// Judges the two face-up cards and ends the turn.
@@ -64,11 +115,46 @@ final class GameModel {
         let open = faceUpIndices
         guard open.count == 2 else { return }
 
+        clock.cancelPending()
+        phase = .idle
+
         let (first, second) = (open[0], open[1])
         let matched = cards[first].symbol == cards[second].symbol
         let resolved: CardState = matched ? .matched : .faceDown
         cards[first].state = resolved
         cards[second].state = resolved
         moveCount += 1
+    }
+
+    /// The 300 ms pause is up: a matched pair is done, a mismatched one goes
+    /// on show for its 900 ms window.
+    private func judgePair() {
+        let open = faceUpIndices
+        guard case .judging = phase, open.count == 2 else {
+            phase = .idle
+            return
+        }
+
+        let (first, second) = (open[0], open[1])
+        guard cards[first].symbol == cards[second].symbol else {
+            phase = .showingMismatch(first: first, second: second)
+            clock.schedule(after: Self.mismatchWindowMilliseconds) { [weak self] in
+                self?.endMismatch(first, second)
+            }
+            return
+        }
+
+        cards[first].state = .matched
+        cards[second].state = .matched
+        moveCount += 1
+        phase = .idle
+    }
+
+    /// Turns a mismatched pair back down and closes the turn.
+    private func endMismatch(_ first: Int, _ second: Int) {
+        cards[first].state = .faceDown
+        cards[second].state = .faceDown
+        moveCount += 1
+        phase = .idle
     }
 }
