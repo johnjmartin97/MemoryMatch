@@ -34,12 +34,14 @@ struct ContentView: View {
                 Palette.backgroundGradient(colorScheme)
                     .ignoresSafeArea()
 
-                VStack(spacing: 16) {
+                VStack(spacing: Metrics.topBarStackSpacing) {
                     // Placeholder for the top bar PP-4 brings in; the launch
                     // UI test looks for this title.
                     Text("MemoryMatch")
-                        .font(.system(size: 17, weight: .medium, design: .rounded))
+                        .font(Typography.body.font)
                         .foregroundStyle(Palette.textMuted(colorScheme))
+                        .frame(height: Metrics.topBarHeight)
+                        .padding(.horizontal, Metrics.topBarSideInset)
                         .accessibilityIdentifier("app.title")
 
                     BoardView(cards: cards)
