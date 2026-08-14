@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="dawn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FDF6EC"/>
+      <stop offset="1" stop-color="#F0E2D2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.32" r="0.72">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="backField" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#357C8C"/>
+      <stop offset="1" stop-color="#2E6F7E"/>
+    </linearGradient>
+    <linearGradient id="faceField" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F7EFE4"/>
+    </linearGradient>
+    <linearGradient id="starInk" x1="0" y1="0" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#E8B04A"/>
+      <stop offset="1" stop-color="#E0A32E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed dawn wash: no transparency anywhere. -->
+  <rect width="1024" height="1024" fill="url(#dawn)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <!-- Face-down card, tilted left. Soft contact shadow drawn as a shape,
+       so the icon rasterises identically on every renderer. -->
+  <g transform="translate(404 528) rotate(-9)">
+    <rect x="-192" y="-252" width="400" height="540" rx="56" ry="56" fill="#B99C7E" opacity="0.20"/>
+    <rect x="-196" y="-262" width="400" height="540" rx="56" ry="56" fill="#C7A98A" opacity="0.28"/>
+    <rect x="-200" y="-270" width="400" height="540" rx="56" ry="56" fill="url(#backField)"/>
+    <g fill="none" stroke="#22545F" stroke-linejoin="round" stroke-width="10">
+      <rect x="-159" y="-229" width="318" height="458" rx="41" ry="41" opacity="0.22"/>
+      <rect x="-123" y="-193" width="246" height="386" rx="34" ry="34" opacity="0.16"/>
+      <rect x="-87" y="-157" width="174" height="314" rx="27" ry="27" opacity="0.10"/>
+    </g>
+    <rect x="-200" y="-270" width="400" height="540" rx="56" ry="56" fill="none" stroke="#000000" stroke-opacity="0.08" stroke-width="8"/>
+  </g>
+
+  <!-- Face-up card, tilted right, overlapping and lifted. -->
+  <g transform="translate(632 496) rotate(8)">
+    <rect x="-192" y="-252" width="400" height="540" rx="56" ry="56" fill="#B99C7E" opacity="0.22"/>
+    <rect x="-196" y="-262" width="400" height="540" rx="56" ry="56" fill="#C7A98A" opacity="0.30"/>
+    <rect x="-200" y="-270" width="400" height="540" rx="56" ry="56" fill="url(#faceField)"/>
+    <!-- star.fill silhouette, 52% of the card's shorter side -->
+    <g transform="translate(0 0) scale(112)">
+      <path d="M 0,-1 L 0.2792,-0.3843 L 0.9511,-0.3090 L 0.4518,0.1468 L 0.5878,0.8090 L 0,0.4750 L -0.5878,0.8090 L -0.4518,0.1468 L -0.9511,-0.3090 L -0.2792,-0.3843 Z"
+            fill="url(#starInk)" stroke="#E0A32E" stroke-width="0.09" stroke-linejoin="round"/>
+    </g>
+    <rect x="-200" y="-270" width="400" height="540" rx="56" ry="56" fill="none" stroke="#000000" stroke-opacity="0.08" stroke-width="8"/>
+  </g>
+</svg>

@@ -1,0 +1,124 @@
+[
+  {
+    "identifier": "PP-1",
+    "title": "Core game model: deal, card states, turn resolution, win detection",
+    "criteria": [
+      "A new deal produces exactly 16 cards, 8 distinct symbols each appearing exactly twice, and all 16 in state faceDown",
+      "Across 1000 deals with a seeded random generator, every one of the 16 positions holds each of the 8 symbols at least once",
+      "Two deals from two different seeds produce different position-to-symbol orders",
+      "For every one of the 16 positions and every card state in {faceDown, faceUp, matched}, tapping is accepted only when the state is faceDown and the board is unlocked; in all other combinations the model's card states and move count are unchanged",
+      "Tapping the first faceDown card sets exactly that card to faceUp, leaves the other 15 unchanged, and leaves the board unlocked",
+      "Tapping a second faceDown card sets it to faceUp and locks the board",
+      "While the board is locked, a tap on any of the 16 positions leaves all card states and the move count unchanged",
+      "Resolving a turn where both faceUp cards carry the same symbol sets both to matched, unlocks the board, and increments the move count by exactly 1",
+      "Resolving a turn where the two faceUp cards carry different symbols sets both back to faceDown, unlocks the board, and increments the move count by exactly 1",
+      "For every board where all 16 cards are matched, isWon is true; for every board with at least one card not matched, isWon is false",
+      "Over an exhaustive enumeration of all 3^2 state pairs for a chosen pair of positions plus every symbol-equal and symbol-unequal combination, no operation ever leaves three or more cards in faceUp"
+    ],
+    "test_file": "Tests/GameModelTests.swift",
+    "status": "pending",
+    "commit": ""
+  },
+  {
+    "identifier": "PP-2",
+    "title": "Board view renders model state in a 4x4 grid",
+    "criteria": [
+      "A pure display function maps a card in state faceDown to the back appearance, faceUp to the face appearance with that card's symbol, and matched to the face appearance with the matched veil flag set",
+      "The display function's output depends only on the model card, so the same card value always yields the same appearance",
+      "The board view builds exactly 16 cells arranged as 4 rows of 4, in model index order 0 to 15",
+      "Given a board side of 375 pt minus 32 pt inset, the computed card side equals (boardSide - 3 * 10) / 4 and is at least 64 pt",
+      "The computed board side equals min(availableWidth - 32, availableHeight) and the board is square",
+      "The root view shows the dealt board with no menu, splash, or overlay view present at launch"
+    ],
+    "test_file": "Tests/BoardRenderTests.swift",
+    "status": "pending",
+    "commit": ""
+  },
+  {
+    "identifier": "PP-3",
+    "title": "Turn sequencing with cancellable delays and tap-ahead",
+    "criteria": [
+      "With an injectable clock, a matched pair moves from faceUp to matched exactly 300 ms after the second tap, and not before 300 ms",
+      "With an injectable clock, a mismatched pair stays faceUp for 300 ms plus 900 ms, then both return to faceDown, and the board unlocks at that instant",
+      "A tap on a faceDown card during the 900 ms mismatch window immediately sets the mismatched pair to faceDown, sets the tapped card to faceUp, increments the move count by exactly 1, and leaves the board unlocked",
+      "After a tap-ahead, advancing the clock past the cancelled 900 ms window does not flip the new faceUp card down",
+      "A tap during the 300 ms match resolution window leaves all card states and the move count unchanged",
+      "At no point in a 100-tap randomised tap sequence driven through the model are three or more cards simultaneously in faceUp",
+      "Starting a new game while a mismatch window is pending cancels it: advancing the clock leaves the freshly dealt board with all 16 cards faceDown"
+    ],
+    "test_file": "Tests/TurnSequencingTests.swift",
+    "status": "pending",
+    "commit": ""
+  },
+  {
+    "identifier": "PP-4",
+    "title": "Elapsed time, move counter bar, restart control, and save/restore",
+    "criteria": [
+      "Elapsed time is 0 immediately after a deal and starts advancing only on the first accepted card tap",
+      "Moving to the background pauses elapsed time; returning to the foreground resumes it, and the total excludes the backgrounded interval",
+      "Elapsed time stops advancing once all 16 cards are matched",
+      "Encoding then decoding a mid-game state returns the same symbol layout, the same matched positions, the same move count, and the same accumulated elapsed time",
+      "Restoring a saved state that contained cards in faceUp yields those cards in faceDown, with zero cards faceUp",
+      "Restoring a saved state where all 16 cards are matched instead deals a fresh board with all 16 cards faceDown and move count 0",
+      "Launching with no saved state deals a fresh board rather than throwing or showing an empty board",
+      "Tapping restart with zero matched pairs deals a new board immediately and sets move count to 0, with no confirmation requested",
+      "Tapping restart with at least one matched pair requests confirmation and does not change the board until the confirmation is accepted"
+    ],
+    "test_file": "Tests/SessionPersistenceTests.swift",
+    "status": "pending",
+    "commit": ""
+  },
+  {
+    "identifier": "PP-5",
+    "title": "Visual pass against the art direction",
+    "criteria": [
+      "Every colour token named in ART.md exists with the exact light and dark hex values listed, including background gradient stops, surface, primary, primary deep, secondary, accent, success, danger, text primary, text muted, card stroke and matched veil",
+      "The card symbol set contains exactly 8 entries with SF Symbol names star.fill, heart.fill, bolt.fill, leaf.fill, moon.fill, umbrella.fill, anchor and bell.fill, each with a distinct light tint and a distinct dark tint",
+      "The 8 symbol names are all distinct, so each pair is identified by a different silhouette",
+      "Text styles resolve to SF Rounded with sizes 40 bold, 26 semibold, 17 medium and 13 semibold, and the move count and timer styles use monospaced digits",
+      "Corner radii resolve to 14 pt for cards, 24 pt for the win panel and 12 pt for buttons, all continuous",
+      "The card stroke is 1.5 pt and the card-back pattern draws three concentric rounded-rectangle strokes inset 8, 15 and 22 pt at 0.22, 0.16 and 0.10 opacity",
+      "Every spacing value used by the game screen is one of 4, 8, 12, 16, 24 or 32",
+      "The top bar height is 44 pt and the restart control's hit target is at least 44 by 44 pt"
+    ],
+    "test_file": "Tests/ThemeTests.swift",
+    "status": "pending",
+    "commit": ""
+  },
+  {
+    "identifier": "PP-6",
+    "title": "Motion, win overlay, celebration effects, sound and haptics",
+    "criteria": [
+      "The flip animation resolves to 300 ms easeInOut with a rotation3DEffect about the Y axis and perspective 0.35, and the face swaps at 90 degrees",
+      "With Reduce Motion enabled, the flip resolves to a 300 ms easeInOut cross-fade with rotation angle fixed at 0",
+      "The match pop resolves to a spring with response 0.38 and damping fraction 0.55, scaling 1.0 to 1.12 to 1.0; with Reduce Motion it resolves to a 240 ms easeOut with no scale change",
+      "Turn timings are identical whether Reduce Motion is on or off: the match resolves at 300 ms and the mismatch at 1200 ms in both cases",
+      "The match sparkle emits exactly 8 particles of 3 pt over 520 ms to a radius of 46 pt",
+      "The win overlay is not present while any card is unmatched, and becomes present 600 ms after the final pair moves to matched",
+      "The win overlay shows the final move count and the final elapsed time, and its Play Again action deals a board with all 16 cards faceDown and move count 0",
+      "The confetti burst emits 60 ribbons over 2000 ms; with Reduce Motion it resolves to a 400 ms easeOut fade with no fall or spin",
+      "The deal animation staggers the 16 cards by 12 ms each in index order over 260 ms",
+      "The flip, match and win sound effects each resolve to a bundled file that exists, and the audio session category is ambient"
+    ],
+    "test_file": "Tests/MotionAndCelebrationTests.swift",
+    "status": "pending",
+    "commit": ""
+  },
+  {
+    "identifier": "PP-7",
+    "title": "Accessibility labels, identifiers, and a full-game UI test",
+    "criteria": [
+      "Each card exposes an accessibility identifier of the form card-0 through card-15 matching its grid index",
+      "A faceDown card's accessibility label states its row and column and the word face down, with no symbol name",
+      "A faceUp or matched card's accessibility label states its row and column, its state, and its symbol name",
+      "The move counter, timer, restart control, win overlay, and Play Again button each expose a stable accessibility identifier",
+      "The win overlay posts a screen-changed accessibility announcement when it appears",
+      "A UI test launches the app cold and taps a card with no intervening screen or overlay to dismiss",
+      "A UI test plays a full game by reading card labels and matching all 8 pairs, and the win overlay appears showing a move count of at least 8",
+      "A UI test taps Play Again on the win overlay and finds all 16 cards face down with a move count of 0"
+    ],
+    "test_file": "UITests/FullGameUITests.swift",
+    "status": "pending",
+    "commit": ""
+  }
+]
