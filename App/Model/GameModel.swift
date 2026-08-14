@@ -1,11 +1,5 @@
 import Foundation
 
-/// Throwaway red-gate stub, deleted when PP-4 is implemented.
-///
-/// The turn-taking half is the baseline PP-3 already shipped, so the PP-4
-/// tests fail on what PP-4 is about — elapsed time, save/restore and the
-/// restart control — and not on a board that never deals.
-
 /// Where delayed work goes, and where the current moment comes from.
 protocol GameClock {
     /// Seconds since the clock started.
@@ -38,29 +32,79 @@ final class GameModel {
 
     var isLocked: Bool { phase != .idle }
 
-    // MARK: PP-4 surface — declared, not implemented.
+    // MARK: Elapsed time
 
-    /// Seconds of play so far.
-    var elapsed: TimeInterval { 0 }
+    /// Seconds of play so far. Runs from the first accepted tap, pauses in the
+    /// background, and stops for good when the last pair is matched.
+    var elapsed: TimeInterval {
+        guard let runningSince else { return accumulated }
+        return accumulated + (clock.now - runningSince)
+    }
+
+    /// Everything the timer has banked while it was not running.
+    private var accumulated: TimeInterval = 0
+    /// The moment the running stretch began, or nil while paused.
+    private var runningSince: TimeInterval?
+    /// True once the first accepted tap has happened, until the next deal.
+    private var hasStarted = false
+
+    func enterBackground() {
+        bankRunningTime()
+    }
+
+    func enterForeground() {
+        guard hasStarted, !isFinished, runningSince == nil else { return }
+        runningSince = clock.now
+    }
+
+    /// Moves any running stretch into `accumulated` and stops the clock.
+    private func bankRunningTime() {
+        guard let runningSince else { return }
+        accumulated += clock.now - runningSince
+        self.runningSince = nil
+    }
+
+    private var isFinished: Bool { cards.allSatisfy { $0.state == .matched } }
+
+    // MARK: Restart
+
     /// True while the player is being asked to confirm a restart.
     private(set) var isConfirmingRestart = false
+    private var pendingRestartSeed: UInt64 = 0
 
-    func enterBackground() {}
-    func enterForeground() {}
-    func requestRestart(seed: UInt64) {}
-    func confirmRestart() {}
+    /// Restarts at once from an untouched board; asks first if the player has
+    /// matched anything worth losing.
+    func requestRestart(seed: UInt64) {
+        guard cards.contains(where: { $0.state == .matched }) else {
+            newGame(seed: seed)
+            return
+        }
+        pendingRestartSeed = seed
+        isConfirmingRestart = true
+    }
 
-    /// Verbatim copy of the board — no faceUp coercion, no elapsed time.
+    func confirmRestart() {
+        isConfirmingRestart = false
+        newGame(seed: pendingRestartSeed)
+    }
+
+    func cancelRestart() {
+        isConfirmingRestart = false
+    }
+
+    // MARK: Save and restore
+
+    /// The board as it stands, with the time played so far.
     func snapshot() -> SavedGame {
         SavedGame(
             symbols: cards.map(\.symbol),
             states: cards.map(\.state),
             moveCount: moveCount,
-            elapsed: 0
+            elapsed: elapsed
         )
     }
 
-    // MARK: Baseline
+    // MARK: Turn taking
 
     private enum Phase { case idle, revealing, mismatchHold }
 
@@ -74,15 +118,21 @@ final class GameModel {
         newGame(seed: seed)
     }
 
-    /// Reads the save back exactly as it was left.
+    /// Picks up a saved game, or deals a fresh one when there is nothing to
+    /// pick up. A game that was already won is not resumed.
     init(restoring saved: SavedGame?, seed: UInt64, clock: GameClock) {
         self.clock = clock
-        guard let saved else {
+        guard let saved, saved.states.contains(where: { $0 != .matched }) else {
             newGame(seed: seed)
             return
         }
-        cards = zip(saved.symbols, saved.states).map { Card(symbol: $0, state: $1) }
+        // A card left mid-turn comes back face down: the player has had time to
+        // forget it, so showing it again would be a free look.
+        cards = zip(saved.symbols, saved.states).map {
+            Card(symbol: $0, state: $1 == .faceUp ? .faceDown : $1)
+        }
         moveCount = saved.moveCount
+        accumulated = saved.elapsed
     }
 
     func newGame(seed: UInt64) {
@@ -97,6 +147,9 @@ final class GameModel {
         faceUpIndices = []
         phase = .idle
         generation += 1
+        accumulated = 0
+        runningSince = nil
+        hasStarted = false
     }
 
     func tap(_ index: Int) {
@@ -113,11 +166,19 @@ final class GameModel {
         cards[index].state = .faceUp
         faceUpIndices.append(index)
         moveCount += 1
+        startTimingIfNeeded()
 
         guard faceUpIndices.count == 2 else { return }
 
         phase = .revealing
         schedule(after: Timing.reveal) { [weak self] in self?.judgePair() }
+    }
+
+    /// The first accepted tap is what starts the clock.
+    private func startTimingIfNeeded() {
+        guard !hasStarted else { return }
+        hasStarted = true
+        runningSince = clock.now
     }
 
     private func judgePair() {
@@ -129,6 +190,7 @@ final class GameModel {
             cards[second].state = .matched
             faceUpIndices = []
             phase = .idle
+            if isFinished { bankRunningTime() }
         } else {
             phase = .mismatchHold
             schedule(after: Timing.mismatchHold) { [weak self] in
