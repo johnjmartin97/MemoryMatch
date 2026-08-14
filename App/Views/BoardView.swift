@@ -7,6 +7,13 @@ struct BoardView: View {
     /// Identifies the board on screen. A new value means a new deal.
     var dealID: Int = 0
 
+    /// What a tap on a card does. Defaulted to nothing so previews and
+    /// render-only call sites keep working — but the app must pass the
+    /// session's tap, because this closure IS the game: every layer beneath
+    /// it was built and tested green while no view ever called it, and the
+    /// shipped board rendered beautifully and could not be played.
+    var tap: (Int) -> Void = { _ in }
+
     /// Model indices laid out as 4 rows of 4, in order 0 to 15.
     var cellRows: [[Int]] {
         (0..<BoardLayout.rows).map { row in
@@ -28,6 +35,8 @@ struct BoardView: View {
                         ForEach(row, id: \.self) { index in
                             CardCellView(card: cards[index])
                                 .frame(width: side, height: side)
+                                .contentShape(Rectangle())
+                                .onTapGesture { tap(index) }
                                 .modifier(DealInModifier(cardIndex: index, dealID: dealID))
                         }
                     }
