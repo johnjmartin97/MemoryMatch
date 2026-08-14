@@ -23,6 +23,16 @@ struct SeededGenerator: RandomNumberGenerator {
 final class GameModel {
     private(set) var cards: [Card]
 
+    /// Completed turns. A turn counts 1 when it is resolved, match or not.
+    private(set) var moveCount: Int = 0
+
+    /// True while two cards are face up and waiting to be judged. Taps do
+    /// nothing while the board is locked.
+    private(set) var isLocked: Bool = false
+
+    /// True only when all 16 cards are matched.
+    var isWon: Bool { false }
+
     init(seed: UInt64 = .random(in: 0...UInt64.max)) {
         var generator = SeededGenerator(seed: seed)
         let pairs = CardSymbol.allCases.flatMap { [$0, $0] }
@@ -30,4 +40,17 @@ final class GameModel {
             Card(symbol: $0, state: .faceDown)
         }
     }
+
+    /// Builds a board in a given state. The board is locked exactly when two
+    /// cards are face up.
+    init(cards: [Card], moveCount: Int = 0) {
+        self.cards = cards
+        self.moveCount = moveCount
+    }
+
+    /// Turns a face-down card face up, when the board allows it.
+    func tap(_ index: Int) {}
+
+    /// Judges the two face-up cards and ends the turn.
+    func resolveTurn() {}
 }
