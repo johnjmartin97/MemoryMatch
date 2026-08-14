@@ -4,6 +4,9 @@ import SwiftUI
 struct BoardView: View {
     let cards: [Card]
 
+    /// Identifies the board on screen. A new value means a new deal.
+    var dealID: Int = 0
+
     /// Model indices laid out as 4 rows of 4, in order 0 to 15.
     var cellRows: [[Int]] {
         (0..<BoardLayout.rows).map { row in
@@ -25,7 +28,7 @@ struct BoardView: View {
                         ForEach(row, id: \.self) { index in
                             CardCellView(card: cards[index])
                                 .frame(width: side, height: side)
-                                .modifier(DealInModifier(cardIndex: index))
+                                .modifier(DealInModifier(cardIndex: index, dealID: dealID))
                         }
                     }
                 }
@@ -123,22 +126,55 @@ private struct CardFlipView: View, Animatable {
     }
 }
 
+/// The arrival of one card: hidden until its turn in the deal comes round,
+/// then in place.
+struct DealInState: Equatable {
+    /// True once the card has landed.
+    private(set) var isDealt = false
+
+    private var dealtID: Int?
+
+    /// Starts this card's arrival on the given board. Returns the seconds to
+    /// wait before it lands, or `nil` if it has already arrived on this board.
+    mutating func begin(dealID: Int, cardIndex: Int) -> Double? {
+        guard dealtID != dealID else { return nil }
+        dealtID = dealID
+        isDealt = false
+        return Double(Motion.dealDelayMilliseconds(cardIndex: cardIndex)) / 1000
+    }
+
+    mutating func land() {
+        isDealt = true
+    }
+}
+
 /// The card arrives: it fades and lifts into place, 12 ms after the card
 /// before it.
 private struct DealInModifier: ViewModifier {
     let cardIndex: Int
+    let dealID: Int
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var dealt = false
+    @State private var deal = DealInState()
 
     func body(content: Content) -> some View {
         content
-            .opacity(dealt ? 1 : 0)
-            .scaleEffect(reduceMotion || dealt ? 1 : 0.92)
-            .onAppear {
-                let delay = Double(Motion.dealDelayMilliseconds(cardIndex: cardIndex)) / 1000
-                withAnimation(Motion.deal.animation.delay(delay)) { dealt = true }
-            }
+            .opacity(deal.isDealt ? 1 : 0)
+            .scaleEffect(reduceMotion || deal.isDealt ? 1 : 0.92)
+            .onAppear { dealIn() }
+            // The cells are never torn down when the board is re-dealt, so a
+            // new deal has to be noticed here or only the first one animates.
+            .onChange(of: dealID) { _, _ in dealIn() }
+    }
+
+    private func dealIn() {
+        guard let delay = deal.begin(dealID: dealID, cardIndex: cardIndex) else { return }
+        // The card is hidden again first. That has to reach the screen before
+        // the arrival is animated, or on a re-deal both changes land in one
+        // pass and the card simply appears.
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            withAnimation(Motion.deal.animation) { deal.land() }
+        }
     }
 }
 

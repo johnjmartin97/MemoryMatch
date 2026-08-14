@@ -50,7 +50,7 @@ struct ContentView: View {
                         )
                     }
 
-                    BoardView(cards: cards)
+                    BoardView(cards: cards, dealID: session.dealID)
                         .frame(width: size.width, height: size.height)
                 }
 

@@ -24,6 +24,10 @@ final class GameSession {
     private var hasStarted = false
     private var isBackgrounded = false
 
+    /// Identifies the board on screen. Every re-deal gives a new one, so the
+    /// cards deal in again instead of staying where the last board left them.
+    private(set) var dealID = 0
+
     /// True while the restart control is waiting for a yes or no.
     private(set) var isRestartConfirmationRequested = false
 
@@ -151,6 +155,7 @@ final class GameSession {
     // MARK: - Internals
 
     private func deal() {
+        dealID += 1
         model = GameModel(seed: dealGenerator.next(), clock: clock)
         watchForWin()
         bankedElapsed = 0

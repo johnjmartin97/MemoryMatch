@@ -13,12 +13,19 @@ struct ConfettiView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// The moment of the win. Everything on screen is measured from it.
+    @State private var burstStartedAt: Date?
+    /// True once the ribbons have come to rest.
+    @State private var hasSettled = false
+    /// The wait for the end of the burst, held so a second win can replace it.
+    @State private var settle: Task<Void, Never>?
+
     static let ribbonCount = Motion.confetti(reduceMotion: false).ribbonCount
 
     private let ribbonSize = CGSize(width: 6, height: 12)
-    private var duration: Double {
-        Double(Motion.confetti(reduceMotion: false).durationMilliseconds) / 1000
-    }
+
+    /// How long the burst lasts, in seconds.
+    static let duration = Double(Motion.confetti(reduceMotion: false).durationMilliseconds) / 1000
 
     var body: some View {
         GeometryReader { geometry in
@@ -35,14 +42,15 @@ struct ConfettiView: View {
                 }
                 .opacity(isActive ? 1 : 0)
                 .animation(Motion.confetti(reduceMotion: true).animation, value: isActive)
-            } else if isActive {
+            } else if isActive, let burstStartedAt, !hasSettled {
                 TimelineView(.animation) { timeline in
                     Canvas { context, size in
-                        let elapsed = timeline.date.timeIntervalSinceReferenceDate
                         draw(
-                            ribbons: ribbons,
-                            elapsed: elapsed,
-                            in: size,
+                            Self.drawnRibbons(
+                                now: timeline.date,
+                                burstStartedAt: burstStartedAt,
+                                in: size
+                            ),
                             context: &context
                         )
                     }
@@ -51,36 +59,77 @@ struct ConfettiView: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        .onAppear { startBurst() }
+        .onChange(of: isActive) { _, active in
+            if active { startBurst() }
+        }
+    }
+
+    /// Marks the moment of the win, and takes the canvas away again once the
+    /// two seconds are up so nothing keeps redrawing behind the win panel.
+    private func startBurst() {
+        guard isActive, !reduceMotion else { return }
+        settle?.cancel()
+        burstStartedAt = Date()
+        hasSettled = false
+        settle = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(Self.duration * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            hasSettled = true
+        }
     }
 
     // MARK: - Drawing
 
-    private func draw(
-        ribbons: [Ribbon],
-        elapsed: TimeInterval,
-        in size: CGSize,
-        context: inout GraphicsContext
-    ) {
-        // Anchor the burst to whole seconds so the animation is stable across
-        // redraws without needing any stored start date.
-        let phase = elapsed.truncatingRemainder(dividingBy: duration)
+    /// One ribbon as it appears in a single frame.
+    struct DrawnRibbon: Equatable {
+        let id: Int
+        let position: CGPoint
+        let radians: Double
+        let opacity: Double
+    }
 
-        for ribbon in ribbons {
-            let t = phase
-            guard t >= ribbon.delay else { continue }
-            let local = t - ribbon.delay
+    /// Every ribbon on screen at `now`, for a burst that began at
+    /// `burstStartedAt`. Empty once the burst has settled.
+    static func drawnRibbons(
+        now: Date,
+        burstStartedAt: Date,
+        in size: CGSize
+    ) -> [DrawnRibbon] {
+        // Time is measured from the win itself, so the burst always starts at
+        // its beginning and, once it has settled, stays settled.
+        let elapsed = now.timeIntervalSince(burstStartedAt)
+        guard isBurstRunning(now: now, burstStartedAt: burstStartedAt) else { return [] }
+
+        return ribbons(count: ribbonCount, in: size).compactMap { ribbon -> DrawnRibbon? in
+            guard elapsed >= ribbon.delay else { return nil }
+            let local = elapsed - ribbon.delay
             let life = duration - ribbon.delay
-            guard life > 0 else { continue }
+            guard life > 0 else { return nil }
             let progress = min(1.0, local / life)
 
-            let point = position(for: ribbon, at: local, in: size)
-            let angle = ribbon.spin * local * 6.0
-            let fade = progress > 0.7 ? (1.0 - (progress - 0.7) / 0.3) : 1.0
+            return DrawnRibbon(
+                id: ribbon.id,
+                position: position(for: ribbon, at: local, in: size),
+                radians: ribbon.spin * local * 6.0,
+                opacity: progress > 0.7 ? (1.0 - (progress - 0.7) / 0.3) : 1.0
+            )
+        }
+    }
 
+    /// True while the burst still has something to draw. It runs once: after
+    /// two seconds the ribbons have settled and nothing is redrawn again.
+    static func isBurstRunning(now: Date, burstStartedAt: Date) -> Bool {
+        let elapsed = now.timeIntervalSince(burstStartedAt)
+        return elapsed >= 0 && elapsed < duration
+    }
+
+    private func draw(_ drawn: [DrawnRibbon], context: inout GraphicsContext) {
+        for ribbon in drawn {
             var layer = context
-            layer.opacity = fade
-            layer.translateBy(x: point.x, y: point.y)
-            layer.rotate(by: .radians(angle))
+            layer.opacity = ribbon.opacity
+            layer.translateBy(x: ribbon.position.x, y: ribbon.position.y)
+            layer.rotate(by: .radians(ribbon.radians))
             layer.fill(
                 Path(
                     roundedRect: CGRect(
@@ -91,13 +140,13 @@ struct ConfettiView: View {
                     ),
                     cornerRadius: 1.5
                 ),
-                with: .color(color(for: ribbon))
+                with: .color(colorFor(ribbon.id))
             )
         }
     }
 
     /// Burst upward and out, then fall — gravity settles them near the bottom.
-    private func position(
+    private static func position(
         for ribbon: Ribbon,
         at time: TimeInterval,
         in size: CGSize
@@ -126,7 +175,12 @@ struct ConfettiView: View {
     }
 
     private func color(for ribbon: Ribbon) -> Color {
-        switch ribbon.colorIndex {
+        colorFor(ribbon.id)
+    }
+
+    /// Ribbons take the three palette colours in turn.
+    private func colorFor(_ ribbonID: Int) -> Color {
+        switch ribbonID % 3 {
         case 0: return Palette.secondary(colorScheme)
         case 1: return Palette.accent(colorScheme)
         default: return Palette.primary(colorScheme)
