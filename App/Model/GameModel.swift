@@ -38,19 +38,34 @@ final class GameModel {
         cards.indices.filter { cards[$0].state == .faceUp }
     }
 
-    init(seed: UInt64 = .random(in: 0...UInt64.max)) {
+    /// Where delayed work goes. Held so a test can drive time by hand.
+    @ObservationIgnored private let clock: TurnClock
+
+    init(
+        seed: UInt64 = .random(in: 0...UInt64.max),
+        clock: TurnClock = SystemTurnClock()
+    ) {
+        self.clock = clock
+        cards = []
+        newGame(seed: seed)
+    }
+
+    /// Builds a board in a given state. The board is locked exactly when two
+    /// cards are face up.
+    init(cards: [Card], moveCount: Int = 0, clock: TurnClock = SystemTurnClock()) {
+        self.clock = clock
+        self.cards = cards
+        self.moveCount = moveCount
+    }
+
+    /// Deals a fresh board and clears the move count.
+    func newGame(seed: UInt64 = .random(in: 0...UInt64.max)) {
         var generator = SeededGenerator(seed: seed)
         let pairs = CardSymbol.allCases.flatMap { [$0, $0] }
         cards = pairs.shuffled(using: &generator).map {
             Card(symbol: $0, state: .faceDown)
         }
-    }
-
-    /// Builds a board in a given state. The board is locked exactly when two
-    /// cards are face up.
-    init(cards: [Card], moveCount: Int = 0) {
-        self.cards = cards
-        self.moveCount = moveCount
+        moveCount = 0
     }
 
     /// Turns a face-down card face up, when the board allows it.
