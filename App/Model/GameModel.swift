@@ -27,6 +27,8 @@ enum Timing {
 /// back.
 final class GameModel {
     private(set) var cards: [Card] = []
+    /// Completed turns. A turn is a pair of cards, so it counts 1 whether the
+    /// pair matched or not, and counts when the turn finishes — not on a tap.
     private(set) var moveCount = 0
 
     /// True while a turn is still settling: taps do nothing during the reveal,
@@ -64,22 +66,20 @@ final class GameModel {
 
     func tap(_ index: Int) {
         guard cards.indices.contains(index) else { return }
+        // Taps do nothing while a pair is being judged.
+        guard phase != .revealing else { return }
+        // Only a face-down card is a move. Anything else — a card already
+        // matched, or one of the two still on show — leaves the board alone,
+        // including a hold that is running.
+        guard cards[index].state == .faceDown else { return }
 
-        switch phase {
-        case .revealing:
-            return
-        case .mismatchHold:
+        if phase == .mismatchHold {
             // Tap-ahead: end the hold now and carry on with this tap.
             turnFaceUpCardsDown()
-        case .idle:
-            break
         }
-
-        guard cards[index].state == .faceDown else { return }
 
         cards[index].state = .faceUp
         faceUpIndices.append(index)
-        moveCount += 1
 
         guard faceUpIndices.count == 2 else { return }
 
@@ -96,6 +96,7 @@ final class GameModel {
             cards[second].state = .matched
             faceUpIndices = []
             phase = .idle
+            moveCount += 1
         } else {
             phase = .mismatchHold
             schedule(after: Timing.mismatchHold) { [weak self] in
@@ -104,7 +105,13 @@ final class GameModel {
         }
     }
 
+    /// Ends a mismatched turn, either when its hold runs out or when a
+    /// tap-ahead cuts the hold short. Either way the turn is over, so it is
+    /// counted here — one move per turn, matching the matched case.
     private func turnFaceUpCardsDown() {
+        if faceUpIndices.count == 2 {
+            moveCount += 1
+        }
         for index in faceUpIndices {
             cards[index].state = .faceDown
         }
