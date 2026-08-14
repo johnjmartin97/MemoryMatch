@@ -41,11 +41,16 @@ final class GameModel {
     /// Where delayed work goes. Held so a test can drive time by hand.
     @ObservationIgnored private let clock: TurnClock
 
+    /// Called the moment the last pair turns matched.
+    @ObservationIgnored var onWin: (() -> Void)?
+
     /// How long a finished pair stays face up before it is judged.
-    static let matchPauseMilliseconds = 300
+    static let matchPauseMilliseconds = Motion.matchResolveMilliseconds(reduceMotion: false)
 
     /// How long a mismatched pair stays on show before it turns back down.
-    static let mismatchWindowMilliseconds = 900
+    /// The two waits together are the mismatch timing the player feels.
+    static let mismatchWindowMilliseconds =
+        Motion.mismatchResolveMilliseconds(reduceMotion: false) - matchPauseMilliseconds
 
     /// Where the current turn has got to.
     private enum Phase {
@@ -124,6 +129,7 @@ final class GameModel {
         cards[first].state = resolved
         cards[second].state = resolved
         moveCount += 1
+        announceWin()
     }
 
     /// The 300 ms pause is up: a matched pair is done, a mismatched one goes
@@ -148,6 +154,12 @@ final class GameModel {
         cards[second].state = .matched
         moveCount += 1
         phase = .idle
+        announceWin()
+    }
+
+    private func announceWin() {
+        guard isWon else { return }
+        onWin?()
     }
 
     /// Turns a mismatched pair back down and closes the turn.

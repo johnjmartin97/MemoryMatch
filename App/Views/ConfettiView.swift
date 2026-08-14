@@ -1,5 +1,36 @@
 import SwiftUI
 
+/// The Reduce Motion fade in, held apart from the view so the ribbons cannot
+/// go back to hanging off `isActive`.
+///
+/// The confetti is put on screen with `isActive` already `true`, and it stays
+/// `true` for the whole life of the view. A fade keyed to it therefore never
+/// runs. The opacity lives here instead: it starts at 0, and moves to 1 one
+/// pass later, which is the change the 400 ms easeOut runs on.
+struct ConfettiFadeState: Equatable {
+    /// How strongly the ribbons are showing, 0 to 1.
+    private(set) var opacity: Double = 0
+
+    private var hasBegun = false
+
+    /// The curve the ribbons fade in on.
+    static var animation: Animation { Motion.confetti(reduceMotion: true).animation }
+
+    /// Starts the fade. Returns how many seconds it takes, or `nil` if the
+    /// board is not won yet or the ribbons have already faded in.
+    mutating func begin(isActive: Bool) -> Double? {
+        guard isActive, !hasBegun else { return nil }
+        hasBegun = true
+        opacity = 0
+        return Double(Motion.confetti(reduceMotion: true).durationMilliseconds) / 1000
+    }
+
+    /// The ribbons are all the way in.
+    mutating func complete() {
+        opacity = 1
+    }
+}
+
 /// The win celebration: sixty small ribbons that burst upward, spin, and settle
 /// under gravity over two seconds behind the win panel.
 ///
@@ -13,13 +44,25 @@ struct ConfettiView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let ribbonCount = 60
+    /// The moment of the win. Everything on screen is measured from it.
+    @State private var burstStartedAt: Date?
+    /// True once the ribbons have come to rest.
+    @State private var hasSettled = false
+    /// The wait for the end of the burst, held so a second win can replace it.
+    @State private var settle: Task<Void, Never>?
+    /// The Reduce Motion fade in.
+    @State private var fade = ConfettiFadeState()
+
+    static let ribbonCount = Motion.confetti(reduceMotion: false).ribbonCount
+
     private let ribbonSize = CGSize(width: 6, height: 12)
-    private let duration: Double = 2.0
+
+    /// How long the burst lasts, in seconds.
+    static let duration = Double(Motion.confetti(reduceMotion: false).durationMilliseconds) / 1000
 
     var body: some View {
         GeometryReader { geometry in
-            let ribbons = Self.ribbons(count: ribbonCount, in: geometry.size)
+            let ribbons = Self.ribbons(count: Self.ribbonCount, in: geometry.size)
 
             if reduceMotion {
                 // Static scatter that fades in over 400 ms: no fall, no spin.
@@ -30,16 +73,16 @@ struct ConfettiView: View {
                             .position(restingPoint(for: ribbon, in: geometry.size))
                     }
                 }
-                .opacity(isActive ? 1 : 0)
-                .animation(.easeOut(duration: 0.4), value: isActive)
-            } else if isActive {
+                .opacity(fade.opacity)
+            } else if isActive, let burstStartedAt, !hasSettled {
                 TimelineView(.animation) { timeline in
                     Canvas { context, size in
-                        let elapsed = timeline.date.timeIntervalSinceReferenceDate
                         draw(
-                            ribbons: ribbons,
-                            elapsed: elapsed,
-                            in: size,
+                            Self.drawnRibbons(
+                                now: timeline.date,
+                                burstStartedAt: burstStartedAt,
+                                in: size
+                            ),
                             context: &context
                         )
                     }
@@ -48,36 +91,96 @@ struct ConfettiView: View {
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        .onAppear { start() }
+        .onChange(of: isActive) { _, active in
+            if active { start() }
+        }
+    }
+
+    /// The win: either the burst, or the Reduce Motion fade.
+    private func start() {
+        if reduceMotion {
+            startFade()
+        } else {
+            startBurst()
+        }
+    }
+
+    /// Fades the ribbons in over 400 ms. The hidden first frame has to reach
+    /// the screen before the fade is animated, or both changes land in one
+    /// pass and the ribbons simply appear.
+    private func startFade() {
+        guard fade.begin(isActive: isActive) != nil else { return }
+        DispatchQueue.main.async {
+            withAnimation(ConfettiFadeState.animation) { fade.complete() }
+        }
+    }
+
+    /// Marks the moment of the win, and takes the canvas away again once the
+    /// two seconds are up so nothing keeps redrawing behind the win panel.
+    private func startBurst() {
+        guard isActive, !reduceMotion else { return }
+        settle?.cancel()
+        burstStartedAt = Date()
+        hasSettled = false
+        settle = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(Self.duration * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            hasSettled = true
+        }
     }
 
     // MARK: - Drawing
 
-    private func draw(
-        ribbons: [Ribbon],
-        elapsed: TimeInterval,
-        in size: CGSize,
-        context: inout GraphicsContext
-    ) {
-        // Anchor the burst to whole seconds so the animation is stable across
-        // redraws without needing any stored start date.
-        let phase = elapsed.truncatingRemainder(dividingBy: duration)
+    /// One ribbon as it appears in a single frame.
+    struct DrawnRibbon: Equatable {
+        let id: Int
+        let position: CGPoint
+        let radians: Double
+        let opacity: Double
+    }
 
-        for ribbon in ribbons {
-            let t = phase
-            guard t >= ribbon.delay else { continue }
-            let local = t - ribbon.delay
+    /// Every ribbon on screen at `now`, for a burst that began at
+    /// `burstStartedAt`. Empty once the burst has settled.
+    static func drawnRibbons(
+        now: Date,
+        burstStartedAt: Date,
+        in size: CGSize
+    ) -> [DrawnRibbon] {
+        // Time is measured from the win itself, so the burst always starts at
+        // its beginning and, once it has settled, stays settled.
+        let elapsed = now.timeIntervalSince(burstStartedAt)
+        guard isBurstRunning(now: now, burstStartedAt: burstStartedAt) else { return [] }
+
+        return ribbons(count: ribbonCount, in: size).compactMap { ribbon -> DrawnRibbon? in
+            guard elapsed >= ribbon.delay else { return nil }
+            let local = elapsed - ribbon.delay
             let life = duration - ribbon.delay
-            guard life > 0 else { continue }
+            guard life > 0 else { return nil }
             let progress = min(1.0, local / life)
 
-            let point = position(for: ribbon, at: local, in: size)
-            let angle = ribbon.spin * local * 6.0
-            let fade = progress > 0.7 ? (1.0 - (progress - 0.7) / 0.3) : 1.0
+            return DrawnRibbon(
+                id: ribbon.id,
+                position: position(for: ribbon, at: local, in: size),
+                radians: ribbon.spin * local * 6.0,
+                opacity: progress > 0.7 ? (1.0 - (progress - 0.7) / 0.3) : 1.0
+            )
+        }
+    }
 
+    /// True while the burst still has something to draw. It runs once: after
+    /// two seconds the ribbons have settled and nothing is redrawn again.
+    static func isBurstRunning(now: Date, burstStartedAt: Date) -> Bool {
+        let elapsed = now.timeIntervalSince(burstStartedAt)
+        return elapsed >= 0 && elapsed < duration
+    }
+
+    private func draw(_ drawn: [DrawnRibbon], context: inout GraphicsContext) {
+        for ribbon in drawn {
             var layer = context
-            layer.opacity = fade
-            layer.translateBy(x: point.x, y: point.y)
-            layer.rotate(by: .radians(angle))
+            layer.opacity = ribbon.opacity
+            layer.translateBy(x: ribbon.position.x, y: ribbon.position.y)
+            layer.rotate(by: .radians(ribbon.radians))
             layer.fill(
                 Path(
                     roundedRect: CGRect(
@@ -88,13 +191,13 @@ struct ConfettiView: View {
                     ),
                     cornerRadius: 1.5
                 ),
-                with: .color(color(for: ribbon))
+                with: .color(colorFor(ribbon.id))
             )
         }
     }
 
     /// Burst upward and out, then fall — gravity settles them near the bottom.
-    private func position(
+    private static func position(
         for ribbon: Ribbon,
         at time: TimeInterval,
         in size: CGSize
@@ -123,7 +226,12 @@ struct ConfettiView: View {
     }
 
     private func color(for ribbon: Ribbon) -> Color {
-        switch ribbon.colorIndex {
+        colorFor(ribbon.id)
+    }
+
+    /// Ribbons take the three palette colours in turn.
+    private func colorFor(_ ribbonID: Int) -> Color {
+        switch ribbonID % 3 {
         case 0: return Palette.secondary(colorScheme)
         case 1: return Palette.accent(colorScheme)
         default: return Palette.primary(colorScheme)
