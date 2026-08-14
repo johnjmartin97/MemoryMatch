@@ -7,6 +7,9 @@ struct BoardView: View {
     /// Identifies the board on screen. A new value means a new deal.
     var dealID: Int = 0
 
+    /// Called with the grid index of the card the player touched.
+    var tap: (Int) -> Void = { _ in }
+
     /// Model indices laid out as 4 rows of 4, in order 0 to 15.
     var cellRows: [[Int]] {
         (0..<BoardLayout.rows).map { row in
@@ -26,9 +29,13 @@ struct BoardView: View {
                 ForEach(cellRows, id: \.self) { row in
                     HStack(spacing: Metrics.cardGap) {
                         ForEach(row, id: \.self) { index in
-                            CardCellView(card: cards[index])
-                                .frame(width: side, height: side)
-                                .modifier(DealInModifier(cardIndex: index, dealID: dealID))
+                            CardCellView(
+                                index: index,
+                                card: cards[index],
+                                tap: { tap(index) }
+                            )
+                            .frame(width: side, height: side)
+                            .modifier(DealInModifier(cardIndex: index, dealID: dealID))
                         }
                     }
                 }
@@ -42,7 +49,9 @@ struct BoardView: View {
 /// One cell: the appearance the display function asks for, turned over, with
 /// the sound and the tap that go with the change.
 private struct CardCellView: View {
+    let index: Int
     let card: Card
+    let tap: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -50,6 +59,19 @@ private struct CardCellView: View {
     private var isFaceUp: Bool { CardAppearance(card: card) != .back }
 
     private var isMatched: Bool { card.state == .matched }
+
+    /// What VoiceOver says: where the card sits, what state it is in, and —
+    /// only once it is showing — which face it wears. A face-down card gives
+    /// its face away to nobody.
+    private var spokenLabel: String {
+        let place = "Row \(index / BoardLayout.columns + 1), "
+            + "column \(index % BoardLayout.columns + 1)"
+        switch card.state {
+        case .faceDown: return "\(place), face down"
+        case .faceUp: return "\(place), face up, \(card.symbol.accessibilityLabel)"
+        case .matched: return "\(place), matched, \(card.symbol.accessibilityLabel)"
+        }
+    }
 
     var body: some View {
         let motion = Motion.flip(reduceMotion: reduceMotion)
@@ -73,6 +95,14 @@ private struct CardCellView: View {
         }
         .animation(motion.animation, value: isFaceUp)
         .matchPop(isMatched: isMatched)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: tap)
+        // One element per card: the face view underneath has a label of its
+        // own, and a card must speak once, with its place at the front.
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier("card-\(index)")
+        .accessibilityLabel(spokenLabel)
+        .accessibilityAddTraits(.isButton)
         .onChange(of: card.state) { _, state in
             switch state {
             case .faceUp:

@@ -9,6 +9,16 @@ struct WinOverlayView: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    /// The screen-changed announcement, once it has gone out. VoiceOver reads
+    /// it aloud; the headline then carries it as its label, which is the only
+    /// way a UI test outside the app can see that it was posted.
+    @State private var announced: String?
+
+    /// What the overlay announces when it takes over the screen.
+    private var announcement: String {
+        "All matched in \(moveCountText) moves, \(elapsedText)"
+    }
+
     /// The final move count, as shown.
     var moveCountText: String { "\(moveCount)" }
 
@@ -25,6 +35,10 @@ struct WinOverlayView: View {
                 Text("All matched")
                     .font(Typography.title.font)
                     .foregroundStyle(Palette.accent(colorScheme))
+                    .accessibilityLabel(announced ?? "All matched")
+                    .accessibilityIdentifier(
+                        announced == nil ? "win.headline" : "win.announcement"
+                    )
 
                 HStack(spacing: 32) {
                     stat(label: "MOVES", value: moveCountText)
@@ -50,7 +64,14 @@ struct WinOverlayView: View {
             )
             .padding(32)
         }
+        // A container, not one element: the Play Again button underneath has
+        // to stay reachable on its own.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("win.overlay")
+        .onAppear {
+            UIAccessibility.post(notification: .screenChanged, argument: announcement)
+            announced = announcement
+        }
     }
 
     private func stat(label: String, value: String) -> some View {

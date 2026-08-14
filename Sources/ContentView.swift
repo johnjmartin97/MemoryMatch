@@ -50,7 +50,11 @@ struct ContentView: View {
                         )
                     }
 
-                    BoardView(cards: cards, dealID: session.dealID)
+                    BoardView(
+                        cards: cards,
+                        dealID: session.dealID,
+                        tap: { session.tap($0) }
+                    )
                         .frame(width: size.width, height: size.height)
                 }
 

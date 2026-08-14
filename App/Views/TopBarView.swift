@@ -15,7 +15,8 @@ struct TopBarView: View {
                 label: "MOVES",
                 value: "\(moveCount)",
                 style: Typography.moveCount,
-                tint: Palette.secondary(colorScheme)
+                tint: Palette.secondary(colorScheme),
+                valueIdentifier: "board.moveCount"
             )
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -23,10 +24,11 @@ struct TopBarView: View {
                 label: "TIME",
                 value: TopBarView.clockText(elapsed),
                 style: Typography.timer,
-                tint: Palette.textPrimary(colorScheme)
+                tint: Palette.textPrimary(colorScheme),
+                valueIdentifier: "board.timer",
+                // The launch UI test looks for this element by identifier.
+                captionIdentifier: "app.title"
             )
-            // The launch UI test looks for this element by identifier.
-            .accessibilityIdentifier("app.title")
 
             Button(action: restart) {
                 Image(systemName: "arrow.clockwise")
@@ -56,16 +58,21 @@ struct TopBarView: View {
         label: String,
         value: String,
         style: TextStyle,
-        tint: Color
+        tint: Color,
+        valueIdentifier: String,
+        captionIdentifier: String = ""
     ) -> some View {
         VStack(spacing: 0) {
             Text(label)
                 .font(Typography.caption.font)
                 .tracking(Typography.captionTracking)
                 .foregroundStyle(Palette.textMuted(colorScheme))
+                .accessibilityIdentifier(captionIdentifier)
             Text(value)
                 .font(style.font)
                 .foregroundStyle(tint)
+                .accessibilityLabel("\(label.lowercased()) \(value)")
+                .accessibilityIdentifier(valueIdentifier)
         }
     }
 }
